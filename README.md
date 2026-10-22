@@ -4,8 +4,13 @@ Benchmark local LLM inference across runtimes — time to first token,
 tokens per second, and the memory the runtime says the model occupies —
 at fixed prompts, with no runtime dependencies.
 
+Not published on PyPI; install from a clone (Python 3.10+, no runtime
+dependencies):
+
 ```bash
-pip install model-bench
+git clone https://github.com/hellpuffyt/model-bench && cd model-bench
+python -m venv .venv && . .venv/bin/activate
+pip install .
 ```
 
 ```bash
@@ -87,6 +92,14 @@ measure Python. Runtimes that cannot report it print
 
 An RTX 4070 SUPER, i9-14900K, Ollama 0.33.2, `--repeat 3 --warmup 1`, the
 built-in prompt suite. These are the tool's own output, not estimates.
+
+> **Provenance.** The `tiny` and `short` rows for `llama3.2:3b` are backed by
+> the committed recording: `model-bench replay fixtures/ollama-llama32-3b.json`
+> reproduces them exactly (re-checked in the latest audit, see
+> [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)). The `long`
+> row, the `qwen2.5-coder:7b` row and the cold-start 1.663 s figure have no
+> recording in this repository and were not re-measured: the audit machine
+> had no local inference runtime installed.
 
 | Model | ttft p50 (short) | tok/s (short) | tok/s (long) | resident |
 | --- | --- | --- | --- | --- |

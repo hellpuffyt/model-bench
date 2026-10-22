@@ -286,3 +286,10 @@ def test_the_committed_fixture_has_reported_token_counts(recording_path: Path) -
     # It came from Ollama, which counts tokens itself; nothing is guessed.
     recording = load(recording_path)
     assert all(s.reported_output_tokens is not None for s in recording.streams)
+
+
+def test_a_binary_file_is_a_recording_error_not_a_traceback(tmp_path: Path) -> None:
+    path = tmp_path / "run.json"
+    path.write_bytes(b"\xff\xfe\x00")
+    with pytest.raises(RecordingError, match="not UTF-8"):
+        load(path)

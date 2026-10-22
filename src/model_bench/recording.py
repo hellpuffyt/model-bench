@@ -219,6 +219,10 @@ def load(path: str | Path) -> Recording:
         text = location.read_text(encoding="utf-8")
     except OSError as error:
         raise RecordingError(f"cannot read recording {location}: {error}") from error
+    except UnicodeDecodeError as error:
+        raise RecordingError(
+            f"{location}: not a recording (not UTF-8 text: {error.reason})"
+        ) from error
     try:
         return loads(text)
     except RecordingError as error:

@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
 adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- Fixed: `model-bench replay` on a non-UTF-8 file crashed with a
+  `UnicodeDecodeError` traceback; it is now a recording error (exit 1).
+- Docs: install from source (not on PyPI); provenance note on the measured
+  results (which rows are backed by the committed recording). Added a
+  hand-computed fake-backend test, `SECURITY.md`, `.editorconfig`,
+  `docs/PRODUCTION_READINESS.md`.
+
 ## [0.1.0] — 2026-08-31
 
 First release.
