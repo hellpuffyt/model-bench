@@ -122,7 +122,8 @@ def _header_lines(report: BenchmarkReport) -> list[str]:
         f"model     {report.model}",
         f"endpoint  {report.endpoint}",
         f"memory    {describe_memory(report.memory)}",
-        f"warmup    {report.warmup} discarded run(s)",
+        f"warmup    {report.warmup} discarded run(s)"
+        + (" when recorded" if report.replayed_from is not None else ""),
         f"tokens    {report.results[0].token_source} by the runtime",
     ]
     if report.replayed_from is not None:

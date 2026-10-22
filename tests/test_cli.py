@@ -278,9 +278,24 @@ def test_a_replayed_report_keeps_the_original_runtime_name(
     assert report.replayed_from == "fixture"
 
 
-def test_a_replayed_report_has_no_warmup(recording_path: Path) -> None:
-    # The warm-up was done when the recording was made, not now.
-    assert replay_report(load(recording_path), "fixture").warmup == 0
+def test_a_replayed_report_states_the_recorded_warmup(recording_path: Path) -> None:
+    # Changed in the audit (was: "has_no_warmup", asserting 0). The warm-up
+    # was done when the recording was made, not now -- which is exactly why
+    # the report must say so: its samples were measured after that warm-up.
+    # Printing "0 discarded run(s)" under a recording made with --warmup 1
+    # contradicted both the recording file and the README's live output.
+    recording = load(recording_path)
+    report = replay_report(recording, "fixture")
+    assert recording.warmup == 1
+    assert report.warmup == 1
+
+
+def test_a_replay_header_says_the_warmup_happened_when_recorded(
+    recording_path: Path,
+) -> None:
+    code, out, _ = run("replay", str(recording_path))
+    assert code == 0
+    assert "warmup    1 discarded run(s) when recorded" in out
 
 
 # --- the run subcommand -----------------------------------------------

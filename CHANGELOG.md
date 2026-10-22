@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
 
+- Fixed: a replayed report printed `warmup 0 discarded run(s)` for a
+  recording made with `--warmup 1` (the recording stores the count). It now
+  prints the recorded count, marked `when recorded`; JSON reports carry the
+  same value. The test that asserted 0 was replaced, with the reason in it.
 - Fixed: `model-bench replay` on a non-UTF-8 file crashed with a
   `UnicodeDecodeError` traceback; it is now a recording error (exit 1).
 - Docs: install from source (not on PyPI); provenance note on the measured

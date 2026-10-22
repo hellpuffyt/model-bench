@@ -1,6 +1,6 @@
 # Production readiness — model-bench
 
-Audit date: 2026-10-22. Tested commit: `d1a3b07` (branch `audit/production-readiness`, based on `main` @ `d6561a9`).
+Audit date: 2026-10-22. Tested commit: see `git log` (follow-up after `d1a3b07`) (branch `audit/production-readiness`, based on `main` @ `d6561a9`).
 
 ## Scope
 
@@ -22,7 +22,7 @@ chunk timings and replays them through the same harness.
   check of the summary statistics from the per-repetition CSV: tiny tok/s mean 179.3 sd 71.1, short
   176.3 sd 3.1; ttft p50/p90 0.023/0.025 and 0.021/0.041 — all match. Hand check: tiny rep 0 tok/s =
   (3−1)/(0.036630−0.022835) = 144.98.
-- **Not verifiable here:** the README's `long` row, the `qwen2.5-coder:7b` row and the 1.663 s cold-start
+- **Not benchmarked in this audit (exact list):** any live run of any runtime/model. **Not backed by a recording in the repo:** the README's `long` row, the `qwen2.5-coder:7b` row and the 1.663 s cold-start
   figure (no recording in the repo, other hardware). README now states this provenance.
 
 ## Clean-clone verification (commit `d1a3b07`)
@@ -40,7 +40,7 @@ uv pip install -e ".[dev]" && pytest && ruff check . && mypy      # 353 passed /
 
 | Command | Baseline (`d6561a9`) | After (`d1a3b07`) |
 | --- | --- | --- |
-| `pytest` | exit 0 — 351 passed, 0 failed, 0 skipped | exit 0 — 353 passed, 0 failed, 0 skipped |
+| `pytest` | exit 0 — 351 passed, 0 failed, 0 skipped | exit 0 — 354 passed, 0 failed, 0 skipped |
 | `ruff check .` / `mypy` | exit 0 / exit 0 | exit 0 / exit 0 |
 | `uvx pip-audit` | — | no known vulnerabilities |
 
@@ -53,9 +53,16 @@ CI status — default branch: success (`d6561a9`, 2026-08-31); audit branch: pen
 | Low (crash) | `replay` of a non-UTF-8 file → `UnicodeDecodeError` traceback | `tests/test_recording.py::test_a_binary_file_is_a_recording_error_not_a_traceback` |
 | Docs | README `pip install model-bench` (not on PyPI); unrecorded results not marked as such | README |
 
-Reviewed and left unchanged: a replayed report prints `warmup 0 discarded run(s)` although the
-recording was made with `--warmup 1`; an existing test (`test_a_replayed_report_has_no_warmup`) defines
-this as intended (replay discards nothing itself). Flagged for the owner, not changed.
+Follow-up (owner request): replay warm-up reporting. The committed recording stores `"warmup": 1`, and the
+README's live output says `warmup 1 discarded run(s)`, but `replay` printed `warmup 0`. The existing test
+(`test_a_replayed_report_has_no_warmup`) reasoned that "the warm-up was done when the recording was made,
+not now". That is true, but the report describes the *samples*, and those were measured after a warm-up of 1.
+Classified as a bug and fixed: the replay report carries the recorded count, and the text header says
+`warmup    1 discarded run(s) when recorded`. JSON `warmup` is now 1. The CSV that CI checks has no
+warmup column and is unchanged. The old test was replaced by
+`test_a_replayed_report_states_the_recorded_warmup` and `test_a_replay_header_says_the_warmup_happened_when_recorded`.
+Both fail on the old code; the justification is written in the test. The README now shows the full real
+replay output and says the live table's `long` row has no recording.
 
 ## Security review
 
@@ -71,6 +78,7 @@ a schema. History secret scan: no hits. `pip-audit`: clean.
 | 2 | Unreachable runtime → no numbers | exit 1, empty stdout | clean clone | PASS |
 | 3 | Replay reproduces recording | CSV identical | clean clone | PASS |
 | 4 | Replay labelled as replay | `source replay of …` | CI step / run | PASS |
+| 4b | Replay states the recorded warm-up | `1 … when recorded` | new tests | PASS |
 | 5 | Live benchmark against a real runtime | table | no runtime installed | NOT VERIFIED |
 
 ## Classification proposal
