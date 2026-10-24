@@ -24,6 +24,7 @@ do not end up in the first two by default.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import os
 import sys
 from collections.abc import Sequence
@@ -216,7 +217,10 @@ def replay_report(recording: Recording, source: str) -> BenchmarkReport:
         replayed_from=source,
         runtime_label=recording.runtime,
     )
-    return outcome.report
+    # Replay itself discards nothing (warmup=0 above: there is no model to
+    # warm), but the samples it reports were measured after the recorded
+    # run's warm-up, and the report describes those samples.
+    return dataclasses.replace(outcome.report, warmup=recording.warmup)
 
 
 def _emit(text: str, destination: str | None, stdout: TextIO) -> None:

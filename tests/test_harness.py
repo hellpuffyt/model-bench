@@ -258,3 +258,19 @@ def test_a_run_is_replayable_from_its_own_recording() -> None:
     assert replayed.report.result("p").total.median == pytest.approx(
         original.report.result("p").total.median
     )
+
+
+def test_a_full_row_matches_a_hand_computation_on_a_fake_backend() -> None:
+    # FAKE BACKEND (ScriptedRuntime): no model runs; the clock is scripted.
+    # Chunks at 0.1 s, 0.2 s, 0.5 s, stream end 0.01 s later; the runtime
+    # reports 3 output tokens. By hand: ttft 0.1, total 0.51,
+    # tok/s = (3 - 1) / (0.51 - 0.1) = 4.878...
+    runtime = ScriptedRuntime([[(0.1, "a"), (0.2, "b"), (0.5, "c")]], reported_tokens=3)
+    outcome = run_benchmark(
+        runtime, "m", [PromptSpec(name="p", text="x")], repeat=2, warmup=0
+    )
+    [result] = outcome.report.results
+    for sample in result.samples:
+        assert sample.ttft_s == pytest.approx(0.1)
+        assert sample.total_s == pytest.approx(0.51)
+        assert sample.tokens_per_second == pytest.approx(2 / 0.41)

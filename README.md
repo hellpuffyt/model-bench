@@ -4,8 +4,13 @@ Benchmark local LLM inference across runtimes — time to first token,
 tokens per second, and the memory the runtime says the model occupies —
 at fixed prompts, with no runtime dependencies.
 
+Not published on PyPI; install from a clone (Python 3.10+, no runtime
+dependencies):
+
 ```bash
-pip install model-bench
+git clone https://github.com/hellpuffyt/model-bench && cd model-bench
+python -m venv .venv && . .venv/bin/activate
+pip install .
 ```
 
 ```bash
@@ -88,6 +93,14 @@ measure Python. Runtimes that cannot report it print
 An RTX 4070 SUPER, i9-14900K, Ollama 0.33.2, `--repeat 3 --warmup 1`, the
 built-in prompt suite. These are the tool's own output, not estimates.
 
+> **Provenance.** The `tiny` and `short` rows for `llama3.2:3b` are backed by
+> the committed recording: `model-bench replay fixtures/ollama-llama32-3b.json`
+> reproduces them exactly (re-checked in the latest audit, see
+> [docs/PRODUCTION_READINESS.md](docs/PRODUCTION_READINESS.md)). The `long`
+> row, the `qwen2.5-coder:7b` row and the cold-start 1.663 s figure have no
+> recording in this repository and were not re-measured: the audit machine
+> had no local inference runtime installed.
+
 | Model | ttft p50 (short) | tok/s (short) | tok/s (long) | resident |
 | --- | --- | --- | --- | --- |
 | `llama3.2:3b` | 0.021 s | 176.3 ± 3.1 | 173.2 ± 0.5 | 2.38 GiB |
@@ -120,7 +133,29 @@ identical on every platform, and reproduces the original to the last
 decimal. Replaying [the committed recording](fixtures/ollama-llama32-3b.json)
 of the run above prints the same `tiny` and `short` rows the live run
 did, byte for byte — [CI asserts exactly that](.github/workflows/ci.yml)
-on every push.
+on every push. The recording holds only those two prompts, so the live
+table's `long` row has no recording behind it. This is the full replay output:
+
+```
+$ model-bench replay fixtures/ollama-llama32-3b.json
+model-bench 0.1.0
+source    replay of fixtures/ollama-llama32-3b.json (not a live run)
+runtime   ollama
+model     llama3.2:3b
+endpoint  http://127.0.0.1:11434/api/generate
+memory    2.38 GiB resident, 2.38 GiB in VRAM (http://127.0.0.1:11434/api/ps)
+warmup    1 discarded run(s) when recorded
+tokens    reported by the runtime
+
+prompt  runs  ttft p50  ttft p90  tok/s mean  tok/s sd  total p50  tokens
+------  ----  --------  --------  ----------  --------  ---------  ------
+tiny       3     0.023     0.025       179.3      71.1      0.033       3
+short      3     0.021     0.041       176.3       3.1      0.750     128
+```
+
+The `warmup` line describes the recorded run (the recording file stores
+`"warmup": 1`): its samples were measured after one discarded generation.
+The replay itself discards nothing, because there is no model to warm.
 
 What replay is *for*: attaching evidence to a claim. A pull request that
 says "this is 8% faster" can carry the recording, and a reviewer can
@@ -204,7 +239,7 @@ outcome.recording.save("run.json")
 
 Anything implementing `model_bench.runtime.Runtime` — three methods —
 can be benchmarked by the same harness. That is what makes the statistics
-core testable without a model: the suite runs 348 tests with no server
+core testable without a model: the whole test suite runs with no server
 and no `sleep`, against recorded streams and a clock the test controls.
 
 ## Development
