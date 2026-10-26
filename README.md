@@ -1,7 +1,7 @@
 # model-bench
 
-Benchmark local LLM inference across runtimes — time to first token,
-tokens per second, and the memory the runtime says the model occupies —
+Benchmark local LLM inference across runtimes: time to first token,
+tokens per second, and the memory the runtime says the model occupies,
 at fixed prompts, with no runtime dependencies.
 
 Not published on PyPI; install from a clone (Python 3.10+, no runtime
@@ -12,6 +12,25 @@ git clone https://github.com/hellpuffyt/model-bench && cd model-bench
 python -m venv .venv && . .venv/bin/activate
 pip install .
 ```
+
+## Demo
+
+<img src="docs/screenshots/ollama-qwen-live-run-and-replay.png" width="100%" alt="Terminal capture: model-bench run against Ollama with qwen2.5:0.5b on an Apple M5, showing 461.22 MiB resident and tok/s of 164.3, 97.4 and 91.6 for the tiny, short and long prompts, followed by model-bench replay of the recording printing the same table labelled as a replay.">
+
+A live run on an Apple M5 (macOS, Ollama 0.40.8, `qwen2.5:0.5b`, a model of
+about 400 MB), recorded with `--record` and then
+replayed. The replay prints the same numbers and says it is a replay. To
+reproduce it, start Ollama and pull the model first:
+
+```bash
+ollama pull qwen2.5:0.5b
+model-bench run --runtime ollama --model qwen2.5:0.5b --repeat 3 --record qwen-run.json
+model-bench replay qwen-run.json
+```
+
+Your numbers will differ with hardware. The output below is the same
+command with `llama3.2:3b` on the RTX 4070 SUPER machine described in
+[Measured results](#measured-results):
 
 ```bash
 model-bench run --runtime ollama --model llama3.2:3b --repeat 3
@@ -42,7 +61,7 @@ Three things go wrong, and model-bench is built around all three.
 **The denominator is a guess.** Tokens per second is tokens ÷ seconds.
 Seconds are easy. Tokens are not: an HTTP client sees chunks of text, and
 chunks are not tokens. So every sample records where its count came from,
-and the report says so on its own line — `tokens reported by the runtime`
+and the report says so on its own line: `tokens reported by the runtime`
 when the server counted them (Ollama's `eval_count`, OpenAI's `usage`),
 `tokens chunks` when they had to be inferred. A number derived from a
 guess is never printed as though it were not.
@@ -50,7 +69,7 @@ guess is never printed as though it were not.
 **The first run is not a run.** The first generation after a model loads
 is mostly disk. On the machine below, the `tiny` prompt's time to first
 token was **1.663 s** with `--warmup 0` on a cold model and **0.023 s**
-with the default `--warmup 1` — a factor of 72, none of it inference.
+with the default `--warmup 1`, a factor of 72, none of it inference.
 model-bench discards `--warmup` generations before measuring and prints
 how many it discarded, so the figure is neither polluted by the load nor
 quietly cleaned up.
@@ -64,7 +83,9 @@ model-bench: runtime 'ollama' at http://127.0.0.1:1/api/tags is unavailable: [Er
 model-bench: no measurement was taken; nothing was estimated in its place
 ```
 
-Exit code 1, nothing on stdout. This is asserted in CI.
+Exit code 1, nothing on stdout. This is asserted in CI. The errno text
+comes from the OS (`[Errno 61]` on macOS). A model the runtime has not
+pulled fails the same way, with `is unavailable: HTTP 404`; pull it first.
 
 ## What it measures
 
@@ -83,8 +104,8 @@ A prompt that yielded fewer than two tokens, or finished inside the
 clock's resolution, prints `n/a` rather than a number derived from timer
 noise.
 
-Memory is what the *runtime* reports about the model it has resident —
-Ollama's `/api/ps` — not the RSS of the benchmark process, which would
+Memory is what the *runtime* reports about the model it has resident
+(Ollama's `/api/ps`), not the RSS of the benchmark process, which would
 measure Python. Runtimes that cannot report it print
 `n/a (this runtime does not report it)`.
 
@@ -108,12 +129,16 @@ built-in prompt suite. These are the tool's own output, not estimates.
 
 Two things worth reading off that table. Throughput on the 7B model is
 almost exactly half the 3B's, and its resident size is almost exactly
-double — on a GPU with room for both, decode is memory-bandwidth bound
+double: on a GPU with room for both, decode is memory-bandwidth bound
 and the ratio falls out of the weights. And the standard deviation on the
 `long` prompt is under 0.6% of the mean on both models, which is what
 makes a 3-run benchmark worth quoting at all; the `tiny` prompt's
 deviation is enormous by comparison (71 on a mean of 179), which is why
 the suite has a `long` prompt.
+
+The Demo run above (Apple M5, `qwen2.5:0.5b`, 461 MiB resident) is the
+only live measurement re-run for this README; its recording is not
+committed.
 
 ## Recordings, and why replay exists
 
@@ -126,13 +151,13 @@ model-bench replay run.json
 ```
 
 Replay is not a mock. It implements the same runtime interface the live
-backends do and drives the same timing loop, statistics and formatter —
+backends do and drives the same timing loop, statistics and formatter;
 the only difference is that its clock is one it advances to each recorded
 offset instead of `time.perf_counter`. So a replay is instantaneous,
 identical on every platform, and reproduces the original to the last
 decimal. Replaying [the committed recording](fixtures/ollama-llama32-3b.json)
 of the run above prints the same `tiny` and `short` rows the live run
-did, byte for byte — [CI asserts exactly that](.github/workflows/ci.yml)
+did, byte for byte, and [CI asserts exactly that](.github/workflows/ci.yml)
 on every push. The recording holds only those two prompts, so the live
 table's `long` row has no recording behind it. This is the full replay output:
 
@@ -182,7 +207,8 @@ is identical. `model-bench prompts` prints exactly what will be sent.
 
 Each prompt caps its own output. Without a cap a chattier model would
 measure as slower for being chattier, and the benchmark would be about
-verbosity. `--prompt-set quick` drops the long one; `--prompts FILE`
+verbosity. `--prompt-set` takes `all` (default), `quick` (tiny and
+short), or a single prompt name (`tiny`, `short`, `long`); `--prompts FILE`
 takes a JSON list of `{name, text, max_tokens}` instead.
 
 ## Runtimes
@@ -193,8 +219,9 @@ takes a JSON list of `{name, text, max_tokens}` instead.
 | `openai` | `POST /v1/chat/completions`, SSE | reported when the server sends `usage` | not exposed |
 
 The `openai` adapter covers llama.cpp's server, vLLM, LM Studio, TGI and
-anything else OpenAI-compatible. It requests `stream_options.include_usage`
-and falls back to chunk counting — labelled as such — when the server
+anything else OpenAI-compatible. It was checked against Ollama's own OpenAI-compatible
+`/v1` endpoint for this README (memory prints `n/a`). It requests `stream_options.include_usage`
+and falls back to chunk counting, labelled as such, when the server
 omits it, which several do.
 
 Generation is pinned to `temperature: 0` with a fixed `--seed`. Sampling
@@ -213,7 +240,7 @@ model-bench run --runtime openai --endpoint http://localhost:8080/v1 \
 ## Output formats
 
 `--format table` (default), `markdown` for pasting into a PR, `json` for
-the full report including every individual sample, and `csv` — which is
+the full report including every individual sample, and `csv`, which is
 one row per *sample*, not per prompt, because a reader who reaches for
 CSV wants to do their own statistics. `-o FILE` writes instead of
 printing.
@@ -237,7 +264,7 @@ print(render(outcome.report, "markdown"))
 outcome.recording.save("run.json")
 ```
 
-Anything implementing `model_bench.runtime.Runtime` — three methods —
+Anything implementing `model_bench.runtime.Runtime` (three methods)
 can be benchmarked by the same harness. That is what makes the statistics
 core testable without a model: the whole test suite runs with no server
 and no `sleep`, against recorded streams and a clock the test controls.
@@ -253,9 +280,14 @@ pytest -q --cov=model_bench --cov-report=term-missing
 ```
 
 Zero runtime dependencies: `urllib.request` is the whole networking
-layer. CI runs the suite on Linux, macOS and Windows across Python
-3.10–3.13.
+layer. The suite has 354 tests and needs no model server. CI runs it on
+Linux, macOS and Windows across Python 3.10 to 3.13, plus ruff, strict
+mypy, coverage, and a job that replays the committed recording and checks
+the unreachable-runtime error.
+
+Security policy: [SECURITY.md](SECURITY.md). Contribution notes:
+[CONTRIBUTING.md](CONTRIBUTING.md). Changes: [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
